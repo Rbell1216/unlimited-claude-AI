@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Interface - Fully Functional</title>
+    <title>Claude Interface - Enhanced & Auto-Reset</title>
     <script src="https://js.puter.com/v2/"></script>
     <style>
         * {
@@ -598,6 +598,22 @@
             color: #e5e5e5;
             white-space: pre;
         }
+        
+        /* Model Check Button style */
+        .check-models-btn {
+            background-color: #333;
+            color: #b3b3b3;
+            border: 1px solid #404040;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+        .check-models-btn:hover {
+            background-color: #444;
+            color: #fff;
+        }
 
         @media (max-width: 768px) {
             .sidebar {
@@ -709,12 +725,14 @@
                             💡 <strong>First time?</strong> A small popup will appear for authentication - please allow it to enable free Claude access via Puter.js
                         </div>
                         <div style="font-size: 12px; color: #808080; text-align: center; margin-bottom: 10px;" id="protocolNotice">
-                            <!-- This will be populated by JS -->
+                            <!-- Populated by JS -->
                         </div>
                         <div style="text-align: center;">
                             <button id="authButton" style="background-color: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;">
                                 🔐 Authenticate with Puter
                             </button>
+                            <!-- NEW: Check Models Button -->
+                            <button id="checkModelsBtn" class="check-models-btn">🔍 Check Available Models</button>
                         </div>
                     </div>
                     
@@ -800,11 +818,13 @@
     <script>
         // Global state
         const availableModels = [
+            // ADDED HAIKU for cheaper usage
+            { apiName: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku (Fast)', shortName: 'Haiku 3' },
             { apiName: 'claude-sonnet-4', displayName: 'Claude Sonnet 4', shortName: 'Sonnet 4' },
             { apiName: 'claude-opus-4', displayName: 'Claude Opus 4', shortName: 'Opus 4' },
             { apiName: 'claude-3-7-sonnet', displayName: 'Claude 3.7 Sonnet', shortName: 'Sonnet 3.7' }
         ];
-        let currentModel = availableModels[0].apiName;
+        let currentModel = availableModels[0].apiName; // Defaults to Haiku now
         let chatHistory = [];
         let isStreaming = false;
         let recentConversations = [];
@@ -817,6 +837,47 @@
             updateModelDisplay();
             updateProtocolNotice();
         });
+
+        // --- NEW: MODEL CHECKER ---
+        async function checkAvailableModels() {
+            console.log("--- Checking Available Models ---");
+            try {
+                if (typeof puter === 'undefined' || !puter.ai || !puter.ai.listModels) {
+                    alert("Puter.js AI module not loaded yet.");
+                    return;
+                }
+                const models = await puter.ai.listModels();
+                console.log("Raw Model List:", models);
+                
+                let modelList = "Available Models Detected:\n\n";
+                if (Array.isArray(models)) {
+                    models.forEach(model => {
+                        modelList += JSON.stringify(model, null, 2) + "\n";
+                    });
+                } else {
+                    modelList += JSON.stringify(models, null, 2);
+                }
+                alert(modelList);
+            } catch (err) {
+                console.error("Failed to list models:", err);
+                alert("Could not fetch models. Check console (F12) for details.");
+            }
+        }
+
+        // --- NEW: SESSION NUKER ---
+        function nukePuterSession() {
+            console.log("🔥 Nuking Puter session data...");
+            // Try to remove specific keys if known, otherwise clear all
+            localStorage.removeItem('puter_auth_token');
+            // Attempt to clear any other puter related keys
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('puter')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            console.log("🔥 Session data cleared. Reloading...");
+            location.reload();
+        }
 
         function updateProtocolNotice() {
             const protocolNotice = document.getElementById('protocolNotice');
@@ -846,11 +907,10 @@
                 console.log('🔐 Manually triggering Puter authentication...');
                 
                 // Trigger authentication with a simple test call
-                const authResponse = await puter.ai.chat("test", {model: 'claude-sonnet-4'});
+                const authResponse = await puter.ai.chat("test", {model: 'claude-3-haiku-20240307'}); // Use Haiku for cheap auth
                 
                 console.log('✅ Raw auth response:', authResponse);
 
-                // Check for a successful response structure
                 if (authResponse && (authResponse.message?.content || authResponse.success !== false)) {
                      console.log('✅ Authentication successful!');
                     if (authButton) {
@@ -874,36 +934,20 @@
                     authButton.style.backgroundColor = '#dc2626';
                 }
                 
-                // --- ENHANCED ERROR MESSAGE ---
                 const troubleshootGuide = `
 ⚠️ AUTHENTICATION FAILED!
 
-This usually happens because of your browser profile settings (extensions, cache, etc.), NOT a bug in the code.
-
-As you noticed, it works in a new Guest or Incognito profile. Here is how to fix it in your MAIN profile:
+This usually happens because of your browser profile settings.
 
 --- TROUBLESHOOTING GUIDE ---
 
 ✅ QUICKEST FIX (TRY FIRST):
-1.  🥷 Use Incognito/Private Mode:
-    • Press Ctrl+Shift+N (Chrome/Edge) or Ctrl+Shift+P (Firefox).
-    • Open this HTML file there. This is the fastest workaround.
+1.  🥷 Use Incognito/Private Mode (Ctrl+Shift+N).
 
-🔧 TO FIX YOUR MAIN PROFILE (TRY IN ORDER):
-2.  🔌 Disable Extensions:
-    • Go to your browser's extensions page (e.g., chrome://extensions).
-    • TEMPORARILY disable ALL extensions, especially ad-blockers (uBlock, AdBlock) and privacy blockers.
-    • Refresh this page and try authenticating again.
-
-3.  🧹 Clear Site Data for Puter:
-    • Go to puter.com, click the 🔒 icon in the address bar -> Site Settings/Cookies and site data -> Delete data.
-    • Refresh this page and try again.
-
-4.  🍪 Allow Third-Party Cookies:
-    • Go to your browser's cookie settings (e.g., chrome://settings/cookies).
-    • Ensure "Block third-party cookies" is NOT enabled, or add "[*.]puter.com" to the allowed list.
-
-If you are running this from a local server (like localhost), the issue is almost certainly extensions or cookie settings.
+🔧 TO FIX YOUR MAIN PROFILE:
+2.  🔌 Disable Extensions (especially ad-blockers).
+3.  🧹 Clear Site Data for Puter.com.
+4.  🍪 Allow Third-Party Cookies.
 `;
                 alert(troubleshootGuide);
             }
@@ -918,8 +962,10 @@ If you are running this from a local server (like localhost), the issue is almos
             const actionBtns = document.querySelectorAll('.action-btn');
             const modelSelectors = document.querySelectorAll('#modelSelector, #chatModelSelector');
             const authButton = document.getElementById('authButton');
+            const checkModelsBtn = document.getElementById('checkModelsBtn');
 
             if (authButton) authButton.addEventListener('click', handleManualAuth);
+            if (checkModelsBtn) checkModelsBtn.addEventListener('click', checkAvailableModels);
 
             [welcomeInput, chatInput].forEach(textarea => {
                 if (textarea) {
@@ -1058,9 +1104,7 @@ If you are running this from a local server (like localhost), the issue is almos
         function startNewChat() {
             chatHistory = [];
             currentConversationId = null;
-            
-            // --- BUG FIX: Reset model to default on new chat ---
-            currentModel = availableModels[0].apiName;
+            currentModel = availableModels[0].apiName; // Reset to default
             updateModelDisplay();
             
             const welcomeScreen = document.getElementById('welcomeScreen');
@@ -1078,7 +1122,7 @@ If you are running this from a local server (like localhost), the issue is almos
             }
             autoResize(document.getElementById('chatInput'));
             
-            console.log('🆕 Started new chat, model reset to default.');
+            console.log('🆕 Started new chat');
         }
 
         async function sendMessage(message) {
@@ -1126,14 +1170,36 @@ If you are running this from a local server (like localhost), the issue is almos
             } catch (error) {
                 console.error('❌ Error in sendMessage:', error);
                 hideTypingIndicator();
-                addMessage('Sorry, I encountered an error: ' + (error.message || 'Unknown error.'), 'assistant', true);
                 
-                // FIX: The API call failed, so the optimistic user message added to the history
-                // resulted in an invalid state. Remove it to allow the user to try again.
-                if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
-                    chatHistory.pop();
-                }
+                // --- ENHANCED ERROR HANDLING WITH AUTO-RESET OPTION ---
+                const errorMessage = error.message || 'Unknown error.';
+                const isLimitError = errorMessage.toLowerCase().includes('limit') || 
+                                     errorMessage.toLowerCase().includes('quota') ||
+                                     errorMessage.toLowerCase().includes('rate') ||
+                                     errorMessage.toLowerCase().includes('authentication'); // Treat auth fail as limit
 
+                if (isLimitError) {
+                    const resetMsg = '⚠️ Limit reached or Auth Error.\n\nWould you like to reset the session? (This will clear your Puter token so you can re-auth as a new guest).';
+                    // Use a custom modal or confirm for better UX, but alert works for now
+                    addMessage('⚠️ Session Limit or Error. Click "Reset Session" below to try again.', 'assistant', false);
+                    
+                    // Add a reset button to the chat dynamically
+                    const chatMessages = document.getElementById('chatMessages');
+                    const resetDiv = document.createElement('div');
+                    resetDiv.style.textAlign = 'center';
+                    resetDiv.style.marginTop = '10px';
+                    resetDiv.innerHTML = `<button onclick="nukePuterSession()" style="background-color:#ff6b35; color:white; border:none; padding:10px 20px; border-radius:6px; cursor:pointer;">🔄 Reset Session</button>`;
+                    chatMessages.appendChild(resetDiv);
+                    scrollToBottom();
+                    
+                    // Remove the failed user message from history so it can be retried
+                    if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
+                        chatHistory.pop();
+                    }
+                } else {
+                    addMessage('Sorry, I encountered an error: ' + errorMessage, 'assistant', true);
+                }
+                
             } finally {
                 isStreaming = false;
                 setInputState(true);
