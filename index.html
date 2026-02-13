@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude Interface - Dynamic Models & Auto-Reset</title>
+    <title>Claude Interface - Auto Reset (Sonnet 3.5)</title>
     <script src="https://js.puter.com/v2/"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,6 +32,7 @@
         .user-details { flex: 1; }
         .user-name { font-size: 14px; color: #fff; font-weight: 500; }
         .user-plan { font-size: 12px; color: #808080; }
+        .chevron-down { width: 16px; height: 16px; opacity: 0.5; }
         
         /* Main Content */
         .main-content { flex: 1; display: flex; flex-direction: column; background-color: #1a1a1a; }
@@ -40,6 +41,10 @@
         .chat-container { display: none; flex-direction: column; height: 100vh; max-height: 100vh; overflow: hidden; }
         .chat-container.active { display: flex; }
         .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; margin-bottom: 20px; height: calc(100vh - 200px); min-height: 0; scrollbar-width: thin; scrollbar-color: #404040 #262626; scroll-behavior: smooth; }
+        .chat-messages::-webkit-scrollbar { width: 8px; }
+        .chat-messages::-webkit-scrollbar-track { background: #262626; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb:hover { background: #555; }
         .message { margin-bottom: 24px; display: flex; gap: 12px; }
         .message.user { flex-direction: row-reverse; }
         .message-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
@@ -62,7 +67,9 @@
         .search-input { width: 100%; padding: 16px 120px 16px 16px; background-color: #262626; border: 1px solid #404040; border-radius: 12px; color: #fff; font-size: 16px; outline: none; transition: border-color 0.2s; resize: none; min-height: 50px; max-height: 150px; font-family: inherit; }
         .search-input:focus { border-color: #ff6b35; }
         .search-input::placeholder { color: #808080; }
-        .search-actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; align-items: center; }
+        .search-actions { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; }
+        .search-btn { padding: 8px; background: none; border: none; color: #808080; cursor: pointer; border-radius: 6px; transition: background-color 0.2s; }
+        .search-btn:hover { background-color: #404040; }
         .send-btn { padding: 8px; background-color: #ff6b35; border: none; color: white; cursor: pointer; border-radius: 6px; transition: background-color 0.2s; display: flex; align-items: center; justify-content: center; }
         .send-btn:hover { background-color: #e55a2b; }
         .send-btn:disabled { background-color: #404040; cursor: not-allowed; }
@@ -170,24 +177,17 @@
                     
                     <div style="max-width: 600px; margin-bottom: 15px; padding: 12px; background-color: #2a2a2a; border-radius: 8px; border: 1px solid #404040;">
                         <div style="font-size: 13px; color: #b3b3b3; text-align: center; margin-bottom: 10px;">
-                            💡 <strong>Dynamic Mode:</strong> Models loaded via Puter.js API
+                            💡 <strong>Model:</strong> Claude 3.5 Sonnet (via Puter.js)
                         </div>
                         <div style="text-align: center;">
                             <button id="authButton" style="background-color: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;">
                                 🔐 Authenticate
                             </button>
-                            <button id="checkModelsBtn" class="check-models-btn">🔍 Refresh Models</button>
+                            <button id="checkModelsBtn" class="check-models-btn">🔍 Check Models</button>
                         </div>
                     </div>
                     
-                    <div class="model-selector">
-                        <button class="model-btn" id="modelSelector">
-                            <span id="currentModel">Loading models...</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                            </svg>
-                        </button>
-                    </div>
+                    <!-- Model Selector Removed as it was non-functional -->
                     
                     <div class="action-buttons">
                         <button class="action-btn" data-prompt="Help me write">
@@ -226,9 +226,6 @@
                     <div class="search-container">
                         <textarea class="search-input" id="chatInput" placeholder="Message Claude..." rows="1"></textarea>
                         <div class="search-actions">
-                            <button class="model-btn" id="chatModelSelector" style="padding: 6px 8px; font-size: 12px;">
-                                <span id="chatCurrentModel">...</span>
-                            </button>
                             <button class="send-btn" id="chatSendBtn">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -243,8 +240,9 @@
 
     <script>
         // Global state
-        let availableModels = []; // Will be populated dynamically
-        let currentModel = null;  // Will be set after fetch
+        // Hardcoded to the only available model found
+        const currentModel = 'claude-3-5-sonnet-20241022'; // Standard API name for Sonnet 3.5
+        
         let chatHistory = [];
         let isStreaming = false;
         let recentConversations = [];
@@ -253,67 +251,31 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Initializing Claude interface...');
             initializeInterface();
-            loadDynamicModels(); // Fetch models immediately
         });
 
-        // --- NEW: DYNAMIC MODEL LOADER ---
-        async function loadDynamicModels() {
-            console.log("🔍 Fetching available models from Puter...");
+        async function checkAvailableModels() {
+            console.log("--- Checking Available Models ---");
             try {
-                if (typeof puter === 'undefined' || !puter.ai) {
-                    throw new Error("Puter.js not loaded.");
+                if (typeof puter === 'undefined' || !puter.ai || !puter.ai.listModels) {
+                    alert("Puter.js AI module not loaded yet.");
+                    return;
                 }
-                
                 const models = await puter.ai.listModels();
-                console.log("✅ Raw Models List:", models);
-
-                if (models && models.length > 0) {
-                    availableModels = models; // Store raw list
-                    
-                    // Set default model to the first one in the list
-                    currentModel = availableModels[0].id;
-                    
-                    // Update UI
-                    updateModelDisplay();
+                console.log("Raw Model List:", models);
+                
+                let modelList = "Available Models Detected:\n\n";
+                if (Array.isArray(models)) {
+                    models.forEach(model => {
+                        modelList += JSON.stringify(model, null, 2) + "\n";
+                    });
                 } else {
-                    throw new Error("No models returned.");
+                    modelList += JSON.stringify(models, null, 2);
                 }
+                alert(modelList);
             } catch (err) {
-                console.error("❌ Failed to load models:", err);
-                document.getElementById('currentModel').textContent = "Error loading models";
-                document.getElementById('chatCurrentModel').textContent = "Error";
+                console.error("Failed to list models:", err);
+                alert("Could not fetch models. Check console (F12) for details.");
             }
-        }
-
-        function updateModelDisplay() {
-            if (!currentModel || availableModels.length === 0) return;
-            
-            // Find the friendly name if available, otherwise use ID
-            const modelData = availableModels.find(m => m.id === currentModel);
-            const displayName = modelData ? (modelData.name || modelData.id) : currentModel;
-            
-            // Short name for chat header
-            let shortName = displayName;
-            if (displayName.includes('claude')) shortName = displayName.split('-').slice(0, 2).join(' '); // "claude-3-5" -> "claude 3"
-            if (displayName.includes('gpt')) shortName = displayName.replace('openai/', '');
-            
-            document.getElementById('currentModel').textContent = displayName;
-            document.getElementById('chatCurrentModel').textContent = shortName;
-        }
-
-        // Function to cycle models (triggered by button click)
-        function toggleModel() {
-            if (availableModels.length === 0) {
-                alert("Models not loaded yet. Wait or check connection.");
-                return;
-            }
-
-            const currentIndex = availableModels.findIndex(m => m.id === currentModel);
-            const nextIndex = (currentIndex + 1) % availableModels.length;
-            
-            currentModel = availableModels[nextIndex].id;
-            updateModelDisplay();
-            console.log('🔄 Model switched to:', currentModel);
         }
 
         function nukePuterSession() {
@@ -339,7 +301,6 @@
                 
                 console.log('🔐 Manually triggering Puter authentication...');
                 
-                // Use the currently selected model for auth test
                 const authResponse = await puter.ai.chat("test", {model: currentModel});
                 
                 console.log('✅ Raw auth response:', authResponse);
@@ -354,8 +315,6 @@
                            if(authBox) authBox.style.display = 'none';
                         }, 2000);
                     }
-                    // Reload models now that we are auth'd
-                    await loadDynamicModels();
                 } else {
                     throw new Error('Authentication response indicates failure.');
                 }
@@ -382,11 +341,8 @@
             const authButton = document.getElementById('authButton');
             const checkModelsBtn = document.getElementById('checkModelsBtn');
 
-            // Model selector buttons
-            const modelSelectors = document.querySelectorAll('#modelSelector, #chatModelSelector');
-
             if (authButton) authButton.addEventListener('click', handleManualAuth);
-            if (checkModelsBtn) checkModelsBtn.addEventListener('click', loadDynamicModels);
+            if (checkModelsBtn) checkModelsBtn.addEventListener('click', checkAvailableModels);
 
             [welcomeInput, chatInput].forEach(textarea => {
                 if (textarea) {
@@ -414,11 +370,6 @@
                         autoResize(welcomeInput);
                     }
                 });
-            });
-
-            // Add toggle logic to selectors
-            modelSelectors.forEach(selector => {
-                if (selector) selector.addEventListener('click', toggleModel);
             });
 
             if (welcomeInput) welcomeInput.focus();
