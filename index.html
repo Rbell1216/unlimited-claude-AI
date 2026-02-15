@@ -1,39 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claude – AI Interface</title>
-    <script src="https://js.puter.com/v2/"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<meta charset="UTF-8">
+<title>Claude Clone Full</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        /* ===== RESET & TOKENS ===== */
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+<!-- Silent Guest Auth -->
+<script>
+window.puter_config = { anonymous: true };
+</script>
+<script src="https://js.puter.com/v2/"></script>
 
-        :root {
-            --bg:        #111113;
-            --bg-2:      #18181b;
-            --bg-3:      #222227;
-            --bg-4:      #2c2c33;
-            --border:    #2e2e36;
-            --border-2:  #3d3d48;
-            --text:      #e4e4ef;
-            --text-2:    #9090a8;
-            --text-3:    #5c5c72;
-            --accent:    #f97316;
-            --accent-h:  #fb8c3b;
-            --accent-l:  rgba(249, 115, 22, 0.12);
-            --blue:      #60a5fa;
-            --green:     #34d399;
-            --red:       #f87171;
-            --radius:    10px;
-            --radius-lg: 16px;
-            --shadow:    0 4px 24px rgba(0,0,0,0.4);
-        }
+<style>
+/* RESET */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+
+/* THEME */
+:root{
+--bg:#1a1a1a;
+--panel:#202020;
+--sidebar:#252525;
+--border:#333;
+--accent:#ff6b35;
+--text:#e5e5e5;
+--muted:#9ca3af;
+--code:#0f172a;
+}
+body.light{
+--bg:#f7f7f7;
+--panel:#ffffff;
+--sidebar:#f0f0f0;
+--border:#ddd;
+--accent:#ff6b35;
+--text:#111;
+--muted:#555;
+--code:#f3f4f6;
+}
+
+/* LAYOUT */
+body{
+font-family:system-ui,sans-serif;
+background:var(--bg);
+color:var(--text);
+display:flex;
+height:100vh;
+}
+
+/* SIDEBAR */
+.sidebar{
+width:260px;
+background:var(--sidebar);
+border-right:1px solid var(--border);
+display:flex;
+flex-direction:column;
+}
+.sidebar h2{
+padding:15px;
+font-size:18px;
+border-bottom:1px solid var(--border);
+}
+.sidebar button{
+margin:10px;
+padding:10px;
+border:none;
+border-radius:8px;
+background:var(--accent);
+color:white;
+cursor:pointer;
+}
+.chat-list{
+flex:1;
+overflow:auto;
+}
+.chat-item{
+padding:12px 15px;
+border-bottom:1px solid var(--border);
+cursor:pointer;
+}
+.chat-item:hover{background:#333}
+.chat-item.active{background:var(--accent);color:white}
+
+/* MAIN */
+.main{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+.topbar{
+padding:10px 15px;
+border-bottom:1px solid var(--border);
+background:var(--panel);
+display:flex;
+justify-content:space-between;
+font-size:14px;
+}
+.chat{
+flex:1;
+padding:20px;
+overflow:auto;
+}
+
+/* MESSAGES */
+.msg{
+margin-bottom:15px;
+padding:12px;
+border-radius:10px;
+max-width:75%;
+white-space:pre-wrap;
+line-height:1.5;
+}
+.user{
+background:var(--accent);
+color:white;
+margin-left:auto;
+}
+.ai{
+background:var(--panel);
+border:1px solid var(--border);
+}
+
+/* CODE BLOCKS */
+pre{
+background:var(--code);
+padding:10px;
+border-radius:8px;
+overflow:auto;
+}
+code{
+font-family:monospace;
+font-size:13px;
+}
+
+/* INPUT BAR */
+.inputbar{
+padding:12px;
+border-top:1px solid var(--border);
+display:flex;
+gap:10px;
+background:var(--panel);
+}
+textarea{
+flex:1;
+padding:12px;
+border-radius:8px;
+border:1px solid var(--border);
+background:var(--bg);
+color:var(--text);
+resize:none;
+}
+.send{
+padding:12px 16px;
+border:none;
+border-radius:8px;
+background:var(--accent);
+color:white;
+cursor:pointer;
+}
+
+/* TOGGLE */
+.toggle{
+cursor:pointer;
+color:var(--muted);
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+<h2>Claude Clone</h2>
+<button onclick="newChat()">➕ New Chat</button>
+<div class="chat-list" id="chatList"></div>
+</div>
+
+<div class="main">
+<div class="topbar">
+<div id="status">Loading guest auth…</div>
+<div class="toggle" onclick="toggleTheme()">🌓 Theme</div>
+</div>
+
+<div class="chat" id="chat"></div>
+
+<div class="inputbar">
+<textarea id="input" rows="1" placeholder="Message Claude..."></textarea>
+<button class="send" onclick="sendMessage()">Send</button>
+</div>
+</div>
+
+<script>
+/* ================= STATE ================= */
+let chats = JSON.parse(localStorage.getItem("claudeChats")||"[]");
+let currentChat = null;
+let puterReady = false;
+
+/* ================= THEME ================= */
+function toggleTheme(){
+document.body.classList.toggle("light");
+localStorage.setItem("theme",document.body.classList.contains("light")?"light":"dark");
+}
+if(localStorage.getItem("theme")==="light")document.body.classList.add("light");
+
+/* ================= AUTO AUTH ================= */
+async function autoAuth(){
+try{
+await puter.ai.chat("ping",{model:"claude-sonnet-4"});
+puterReady=true;
+status.textContent="✅ Guest authenticated";
+}catch{
+status.textContent="⚠️ Auth will trigger on first message";
+}
+}
+document.addEventListener("DOMContentLoaded",autoAuth);
+
+/* ================= CHAT SYSTEM ================= */
+function newChat(){
+const chat={id:Date.now(),title:"New Chat",messages:[]};
+chats.unshift(chat);
+currentChat=chat;
+saveChats();
+renderChatList();
+renderMessages();
+}
+
+function saveChats(){
+localStorage.setItem("claudeChats",JSON.stringify(chats));
+}
+
+function renderChatList(){
+chatList.innerHTML="";
+chats.forEach(c=>{
+const div=document.createElement("div");
+div.className="chat-item"+(c===currentChat?" active":"");
+div.textContent=c.title;
+div.onclick=()=>{currentChat=c;renderChatList();renderMessages();};
+chatList.appendChild(div);
+});
+}
+
+function renderMessages(){
+chat.innerHTML="";
+if(!currentChat)return;
+currentChat.messages.forEach(m=>addMessage(m.content,m.role));
+}
+
+function addMessage(text,role){
+const div=document.createElement("div");
+div.className="msg "+(role==="user"?"user":"ai");
+div.innerHTML=markdown(text);
+chat.appendChild(div);
+chat.scrollTop=chat.scrollHeight;
+return div;
+}
+
+/* ================= MARKDOWN ================= */
+function markdown(text){
+return text
+.replace(/```([\s\S]*?)```/g,"<pre><code>$1</code></pre>")
+.replace(/\*\*(.*?)\*\*/g,"<b>$1</b>")
+.replace(/\*(.*?)\*/g,"<i>$1</i>")
+.replace(/\n/g,"<br>");
+}
+
+/* ================= SEND MESSAGE ================= */
+async function sendMessage(){
+const text=input.value.trim();
+if(!text||!currentChat)return;
+input.value="";
+
+if(currentChat.messages.length===0){
+currentChat.title=text.slice(0,30);
+renderChatList();
+}
+
+currentChat.messages.push({role:"user",content:text});
+addMessage(text,"user");
+
+const aiDiv=addMessage("...", "ai");
+
+try{
+const res=await puter.ai.chat(currentChat.messages,{
+model:"claude-sonnet-4",
+stream:true
+});
+
+let full="";
+for await(const chunk of res){
+if(chunk.text){
+full+=chunk.text;
+aiDiv.innerHTML=markdown(full);
+}
+}
+
+currentChat.messages.push({role:"assistant",content:full});
+saveChats();
+
+}catch(err){
+aiDiv.textContent="❌ "+err.message;
+console.error(err);
+}
+}
+
+/* ENTER TO SEND */
+input.addEventListener("keydown",e=>{
+if(e.key==="Enter"&&!e.shiftKey){
+e.preventDefault();
+sendMessage();
+}
+});
+
+/* INIT */
+if(chats.length===0)newChat();
+else{currentChat=chats[0];renderChatList();renderMessages();}
+</script>
+
+</body>
+</html>
 
         html, body { height: 100%; overflow: hidden; }
         body {
