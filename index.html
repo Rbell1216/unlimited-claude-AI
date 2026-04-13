@@ -337,13 +337,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
 
-<script type="module">
-    import Client from 'https://g4f.dev/dist/js/client.js';
-    window.g4fClient = new Client();
-</script>
-
 <script>
     (function() {
+        // Initialize G4F Client
+        let g4fClient = null;
+        
+        // Wait for the module to load
+        async function initG4FClient() {
+            try {
+                const module = await import('https://g4f.dev/dist/js/client.js');
+                g4fClient = new module.default();
+                console.log('G4F Client initialized successfully');
+                showToast('Image generation ready!');
+            } catch (err) {
+                console.error('Failed to load G4F client:', err);
+                showToast('Image generation unavailable. Using fallback API.');
+            }
+        }
+        
+        initG4FClient();
+        
         const PROVIDERS = [
             { name: 'Groq', base: 'https://g4f.space/api/groq' },
             { name: 'Ollama', base: 'https://g4f.space/api/ollama' },
@@ -545,14 +558,20 @@
         });
 
         async function generateImage(prompt) {
+            if (!g4fClient) {
+                showToast('G4F client not ready yet. Please wait...');
+                return null;
+            }
+            
             try {
-                const response = await window.g4fClient.images.generate({
+                const response = await g4fClient.images.generate({
                     model: currentImageModel,
                     prompt: prompt
                 });
                 return response.data[0].url;
             } catch (err) {
                 console.error("Image generation failed:", err);
+                showToast(`Error: ${err.message}`);
                 return null;
             }
         }
@@ -694,14 +713,17 @@
         }
 
         async function handleImageGeneration() {
+            console.log('Image generation button clicked');
             const prompt = prompt("Describe the image you want to generate:\n\nExample: 'A beautiful sunset over mountains, digital art style'");
             if (!prompt || streaming) return;
             
+            console.log('Generating image with prompt:', prompt);
             typingBubble.classList.add('on');
             const imageUrl = await generateImage(prompt);
             typingBubble.classList.remove('on');
             
             if (imageUrl) {
+                console.log('Image generated successfully:', imageUrl);
                 if (!activeConvId) {
                     startNewConversation(`[Image] ${prompt.slice(0, 30)}...`);
                     showChatView();
@@ -887,7 +909,14 @@
         welcomeSendBtn.addEventListener('click', handleWelcomeSend);
         chatSendBtn.addEventListener('click', handleChatSend);
         newChatBtn.addEventListener('click', resetToWelcome);
-        document.getElementById('imageGenBtn').addEventListener('click', handleImageGeneration);
+        
+        const imageGenBtn = document.getElementById('imageGenBtn');
+        if (imageGenBtn) {
+            imageGenBtn.addEventListener('click', handleImageGeneration);
+            console.log('Image generation button listener added');
+        } else {
+            console.error('Image generation button not found');
+        }
 
         document.querySelectorAll('.quick-btn:not(#imageGenBtn)').forEach(btn => {
             btn.addEventListener('click', () => {
