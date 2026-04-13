@@ -564,6 +564,7 @@
             }
             
             try {
+                if (apiKey) g4fClient.apiKey = apiKey;
                 const response = await g4fClient.images.generate({
                     model: currentImageModel,
                     prompt: prompt
