@@ -714,7 +714,7 @@
 
         async function handleImageGeneration() {
             console.log('Image generation button clicked');
-            const prompt = prompt("Describe the image you want to generate:\n\nExample: 'A beautiful sunset over mountains, digital art style'");
+            const userPrompt = prompt("Describe the image you want to generate:\n\nExample: 'A beautiful sunset over mountains, digital art style'");
             if (!prompt || streaming) return;
             
             console.log('Generating image with prompt:', prompt);
